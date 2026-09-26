@@ -15,7 +15,10 @@ cp -avf "/ctx/system_files"/. /
 # this installs a package from fedora repos
 dnf5 install -y tmux
 
-dnf5 -y config-manager setopt "terra-mesa".enabled=false
+repo=/etc/yum.repos.d/terra-mesa.repo
+test -f "$repo"
+sed -i -E 's/^[[:space:]]*enabled[[:space:]]*=.*/enabled=0/' "$repo"
+grep -q '^enabled=0$' "$repo"
 
 # Use a COPR Example:
 #
