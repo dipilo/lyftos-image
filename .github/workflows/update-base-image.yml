@@ -1,0 +1,99 @@
+---
+name: Update base image
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-base-image
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump the pinned Bazzite digest
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve the current upstream digest
+        id: resolve
+        run: |
+          set -euo pipefail
+          command -v skopeo >/dev/null || sudo apt-get install -y --no-install-recommends skopeo
+
+          PINNED=$(grep -m1 -E '^FROM .*@sha256:' Containerfile | awk '{print $2}')
+          BASE="${PINNED%@*}"
+          CURRENT="${PINNED#*@}"
+          LATEST=$(skopeo inspect --format '{{.Digest}}' "docker://${BASE}")
+
+          echo "base=${BASE}" >> "${GITHUB_OUTPUT}"
+          echo "current=${CURRENT}" >> "${GITHUB_OUTPUT}"
+          echo "latest=${LATEST}" >> "${GITHUB_OUTPUT}"
+
+          if [[ "${CURRENT}" == "${LATEST}" ]]; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "${BASE} is already pinned to ${LATEST}"
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+            echo "${BASE}: ${CURRENT} -> ${LATEST}"
+          fi
+
+      - name: Open a pull request
+        if: steps.resolve.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ steps.resolve.outputs.base }}
+          CURRENT: ${{ steps.resolve.outputs.current }}
+          LATEST: ${{ steps.resolve.outputs.latest }}
+        run: |
+          set -euo pipefail
+          BRANCH="base-image/${LATEST:7:12}"
+
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            echo "${BRANCH} already exists; nothing to do."
+            exit 0
+          fi
+
+          sed -i "s|${BASE}@${CURRENT}|${BASE}@${LATEST}|" Containerfile
+          grep -qF "${BASE}@${LATEST}" Containerfile
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          git commit -am "Update ${BASE} to ${LATEST:0:19}"
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "${BRANCH}" \
+            --label base-image \
+            --title "Update Bazzite base image to ${LATEST:7:12}" \
+            --body "$(cat <<EOF
+          Pinned base image digest bump.
+
+          | | |
+          | --- | --- |
+          | Image | \`${BASE}\` |
+          | From | \`${CURRENT}\` |
+          | To | \`${LATEST}\` |
+
+          A new Bazzite base can change the kernel, Mesa, and the gaming stack, so
+          **do not merge this without boot-testing the resulting \`testing\` image**
+          against the checklist in \`docs/release-process.md\`.
+
+          Merging publishes a new \`testing\` digest. It reaches \`stable\` only
+          through the promote workflow, after that checklist passes.
+
+          Note: this pull request was pushed with \`GITHUB_TOKEN\`, so GitHub will
+          not start the build workflow on it automatically. Push an empty commit,
+          or close and reopen the pull request, to get a build.
+          EOF
+          )"

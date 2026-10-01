@@ -1,0 +1,196 @@
+---
+name: Promote image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Tested tag or digest to promote (e.g. testing-20260930-abc1234, or sha256:...)"
+        required: true
+        default: "testing"
+        type: string
+      channel:
+        description: "Channel to publish it as"
+        required: true
+        default: "stable"
+        type: choice
+        options:
+          - stable
+          - testing
+      move_latest:
+        description: "Also point :latest at this digest"
+        required: false
+        default: true
+        type: boolean
+      notes:
+        description: "What changed, in one or two sentences (goes in the release notes)"
+        required: false
+        type: string
+
+env:
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
+  IMAGE_NAME: ${{ github.event.repository.name }}
+
+concurrency:
+  group: promote-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote ${{ inputs.source }} to ${{ inputs.channel }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release note
+      packages: write # re-tag the image
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Prepare environment
+        run: |
+          set -euo pipefail
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+          command -v skopeo >/dev/null || sudo apt-get install -y --no-install-recommends skopeo
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v3.1.2'
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4.5.1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve source to a digest
+        id: resolve
+        env:
+          SOURCE: ${{ inputs.source }}
+          CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMAGE="${IMAGE_REGISTRY}/${IMAGE_NAME}"
+          if [[ "${SOURCE}" == sha256:* ]]; then
+            REF="${IMAGE}@${SOURCE}"
+          else
+            REF="${IMAGE}:${SOURCE}"
+          fi
+
+          skopeo inspect --creds "${CREDS}" "docker://${REF}" > /tmp/inspect.json
+          DIGEST=$(jq -r '.Digest' /tmp/inspect.json)
+          VERSION=$(jq -r '.Labels["org.opencontainers.image.version"] // "unknown"' /tmp/inspect.json)
+          SOURCE_URL=$(jq -r '.Labels["org.opencontainers.image.source"] // "unknown"' /tmp/inspect.json)
+          CREATED=$(jq -r '.Labels["org.opencontainers.image.created"] // "unknown"' /tmp/inspect.json)
+
+          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "source_url=${SOURCE_URL}" >> "${GITHUB_OUTPUT}"
+          echo "created=${CREATED}" >> "${GITHUB_OUTPUT}"
+          echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify the source image signature
+        env:
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+          IMAGE: ${{ steps.resolve.outputs.image }}
+        run: |
+          set -euo pipefail
+          cosign verify --key cosign.pub "${IMAGE}@${DIGEST}"
+
+      - name: Re-tag the digest
+        env:
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+          IMAGE: ${{ steps.resolve.outputs.image }}
+          CHANNEL: ${{ inputs.channel }}
+          MOVE_LATEST: ${{ inputs.move_latest }}
+          CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAGS=("${CHANNEL}" "${CHANNEL}-$(date -u +%Y%m%d)")
+          if [[ "${MOVE_LATEST}" == "true" ]]; then
+            TAGS+=("latest")
+          fi
+
+          for tag in "${TAGS[@]}"; do
+            skopeo copy --all \
+              --src-creds "${CREDS}" --dest-creds "${CREDS}" \
+              "docker://${IMAGE}@${DIGEST}" "docker://${IMAGE}:${tag}"
+            echo "tagged ${IMAGE}:${tag}"
+          done
+          echo "TAGS=${TAGS[*]}" >> "${GITHUB_ENV}"
+
+      - name: Confirm the channel tag resolves to the promoted digest
+        env:
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+          IMAGE: ${{ steps.resolve.outputs.image }}
+          CHANNEL: ${{ inputs.channel }}
+          CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ACTUAL=$(skopeo inspect --creds "${CREDS}" --format '{{.Digest}}' "docker://${IMAGE}:${CHANNEL}")
+          test "${ACTUAL}" = "${DIGEST}"
+          cosign verify --key cosign.pub "${IMAGE}:${CHANNEL}"
+
+      - name: Publish release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+          IMAGE: ${{ steps.resolve.outputs.image }}
+          CHANNEL: ${{ inputs.channel }}
+          SOURCE: ${{ inputs.source }}
+          NOTES: ${{ inputs.notes }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+          SOURCE_URL: ${{ steps.resolve.outputs.source_url }}
+          CREATED: ${{ steps.resolve.outputs.created }}
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${CHANNEL}-$(date -u +%Y%m%d)-${DIGEST:7:12}"
+          PREVIOUS=$(gh release list --limit 1 --json tagName \
+            --jq '.[0].tagName' 2>/dev/null || true)
+
+          {
+            echo "${NOTES:-No summary was given for this promotion.}"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Channel | \`${CHANNEL}\` |"
+            echo "| Promoted from | \`${SOURCE}\` |"
+            echo "| Digest | \`${DIGEST}\` |"
+            echo "| Build version label | \`${VERSION}\` |"
+            echo "| Built at | ${CREATED} |"
+            echo "| Source revision | ${SOURCE_URL} |"
+            echo "| Also tagged | ${TAGS} |"
+            echo
+            echo "## Install or switch"
+            echo
+            echo '```bash'
+            echo "sudo bootc switch ${IMAGE}:${CHANNEL}"
+            echo '```'
+            echo
+            echo "## Pin this exact image"
+            echo
+            echo '```bash'
+            echo "sudo bootc switch ${IMAGE}@${DIGEST}"
+            echo '```'
+            echo
+            echo "## If it misbehaves"
+            echo
+            echo '```bash'
+            echo "sudo bootc rollback && systemctl reboot   # back to the previous deployment"
+            echo '```'
+            echo
+            if [[ -n "${PREVIOUS}" ]]; then
+              echo "The previous release is [${PREVIOUS}](../../releases/tag/${PREVIOUS})."
+            fi
+            echo
+            echo "A rollback restores the OS only. Home directories are not part of the image"
+            echo "and are not reverted. See docs/updates-and-rollback.md."
+          } > /tmp/notes.md
+
+          gh release create "${RELEASE_TAG}" \
+            --title "lyftOS ${CHANNEL} ${DIGEST:7:12}" \
+            --notes-file /tmp/notes.md

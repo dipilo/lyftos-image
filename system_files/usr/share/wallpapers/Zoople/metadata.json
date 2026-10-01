@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "dipilo"
+            }
+        ],
+        "Id": "Zoople",
+        "License": "Apache-2.0",
+        "Name": "Zoople",
+        "Version": "1.0"
+    }
+}

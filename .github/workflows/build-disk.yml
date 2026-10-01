@@ -15,6 +15,14 @@ on:
         options:
           - amd64
           - arm64
+      channel:
+        description: "Channel the installer should pull from"
+        required: true
+        default: "testing"
+        type: choice
+        options:
+          - testing
+          - stable
   pull_request:
     branches:
       - main
@@ -26,7 +34,7 @@ on:
 env:
   IMAGE_NAME: ${{ github.event.repository.name }} # output of build.yml, keep in sync
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
-  DEFAULT_TAG: "latest"
+  DEFAULT_TAG: ${{ inputs.channel || 'testing' }}
   BIB_IMAGE: "quay.io/centos-bootc/bootc-image-builder:latest"
 
 concurrency:
@@ -76,6 +84,24 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v3.1.2'
+
+      - name: Verify the image the installer will pull
+        run: |
+          set -euo pipefail
+          cosign verify --key cosign.pub "${IMAGE_REGISTRY}/${IMAGE_NAME}:${DEFAULT_TAG}"
+
+      - name: Point the installer at the selected channel
+        if: matrix.disk-type == 'anaconda-iso'
+        run: |
+          set -euo pipefail
+          sed -i "s|${IMAGE_REGISTRY}/${IMAGE_NAME}:stable|${IMAGE_REGISTRY}/${IMAGE_NAME}:${DEFAULT_TAG}|g" ./disk_config/iso-kde.toml
+          grep -F "${IMAGE_REGISTRY}/${IMAGE_NAME}:${DEFAULT_TAG}" ./disk_config/iso-kde.toml
+          cat ./disk_config/iso-kde.toml
 
       - name: Build disk images
         id: build

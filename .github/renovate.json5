@@ -6,6 +6,11 @@
 
   "rebaseWhen": "never",
 
+  // Dependabot already bumps actions
+  "github-actions": {
+    "enabled": false,
+  },
+
   "packageRules": [
     {
       "automerge": true,
@@ -16,6 +21,14 @@
       "matchUpdateTypes": ["digest", "pinDigest", "pin"],
       "matchDepTypes": ["container"],
       "matchFileNames": [".github/workflows/**.yaml", ".github/workflows/**.yml"],
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["ghcr.io/ublue-os/bazzite"],
+      "automerge": false,
+      "addLabels": ["base-image"],
+      "commitMessageTopic": "Bazzite base image",
+      "schedule": ["before 6am on monday"],
     },
   ]
 }

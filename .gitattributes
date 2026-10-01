@@ -1,0 +1,7 @@
+# Authored on Windows, run on Linux: a CRLF shebang breaks build.sh
+# and a CRLF Plasma script fails silently at login.
+* text=auto eol=lf
+
+*.png binary
+*.jxl binary
+*.key binary
