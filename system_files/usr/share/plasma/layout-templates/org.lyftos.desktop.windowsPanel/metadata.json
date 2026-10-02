@@ -1,0 +1,22 @@
+{
+  "KPackageStructure": "Plasma/LayoutTemplate",
+  "KPlugin": {
+    "Id": "org.lyftos.desktop.windowsPanel",
+    "Name": "lyftOS Windows-familiar Panel",
+    "Description": "Bottom panel with application launcher, pinned apps, tray, clock, and desktop corner",
+    "Icon": "lyftos-logo-icon",
+    "License": "Apache-2.0",
+    "Version": "1.0",
+    "Authors": [
+      {
+        "Name": "lyftOS contributors"
+      }
+    ],
+    "Website": "https://github.com/dipilo/lyftos-image"
+  },
+  "X-KDE-PluginInfo-Name": "org.lyftos.desktop.windowsPanel",
+  "X-Plasma-Shell": "plasmashell",
+  "X-Plasma-ContainmentCategories": [
+    "panel"
+  ]
+}

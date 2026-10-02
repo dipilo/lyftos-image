@@ -47,6 +47,13 @@ jobs:
         run: |
           just check
 
+      - name: Check branding behavior
+        run: |
+          node tests/panel-layout.cjs
+          bash -n build_files/build.sh
+          sh -n system_files/usr/libexec/ublue-motd
+          sh -n system_files/usr/share/lyftos/motd/env.sh
+
       - name: Image Name
         id: image-name
         run: |

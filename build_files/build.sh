@@ -2,6 +2,16 @@
 
 set -ouex pipefail
 
+for path in /usr/libexec/ublue-motd /usr/share/yafti/yafti.yml \
+    /usr/share/applications/io.github.ublue_os.yafti_gtk.desktop \
+    /etc/skel/.config/autostart/bazzite-portal.desktop; do
+    test -s "$path"
+    rpm -qf "$path" || true
+done
+
+# Review inherited setup actions when the pinned base changes.
+sha256sum -c /ctx/branding-upstream.sha256
+
 # Keep the base theme's QML and dependencies; overlay our static settings below.
 if [ -d /usr/share/sddm/themes/breeze ]; then
     mkdir -p /usr/share/sddm/themes/lyftos
@@ -15,6 +25,7 @@ done
 
 # Copy the contents of system_files/ of the git repo to /
 cp -avf "/ctx/system_files"/. /
+chmod 0755 /usr/libexec/ublue-motd
 
 for theme in com.valve.vapor.desktop com.valve.vgui.desktop; do
     gzip -t "/usr/share/plasma/look-and-feel/${theme}/contents/splash/images/bazzite_logo.svgz"
@@ -27,7 +38,7 @@ test -f "${wallpaper}/contents/images/3840x2160.png"
 for resolution in 1920x1080 2560x1440 1920x1200 2560x1600; do
     test -s "${wallpaper}/contents/images/${resolution}.png"
 done
-python3 -c "import json,sys; json.load(open(sys.argv[1]))" "${wallpaper}/metadata.json"
+jq -e . "${wallpaper}/metadata.json" > /dev/null
 
 plasma_updates=/usr/share/plasma/shells/org.kde.plasma.desktop/contents/updates
 
@@ -37,10 +48,13 @@ grep -qF "\"${wallpaper}/\"" "$wallpaper_script"
 
 layout_script="$plasma_updates/lyftos-layout-1.js"
 test -f "$layout_script"
-grep -qF 'new Panel("org.kde.panel")' "$layout_script"
-grep -qF 'panel.location = "bottom"' "$layout_script"
+grep -qF 'loadTemplate("org.lyftos.desktop.windowsPanel")' "$layout_script"
+panel_template=/usr/share/plasma/layout-templates/org.lyftos.desktop.windowsPanel
+jq -e '.KPackageStructure == "Plasma/LayoutTemplate" and .KPlugin.Id == "org.lyftos.desktop.windowsPanel"' "$panel_template/metadata.json" > /dev/null
+grep -qF 'new Panel("org.kde.panel")' "$panel_template/contents/layout.js"
+grep -qF 'panel.location = "bottom"' "$panel_template/contents/layout.js"
 for widget in kickoff icontasks systemtray digitalclock showdesktop; do
-    grep -qF "org.kde.plasma.${widget}" "$layout_script"
+    grep -qF "org.kde.plasma.${widget}" "$panel_template/contents/layout.js"
 done
 
 if [ ! -f "$plasma_updates/bazzite-pins.js" ]; then
@@ -101,6 +115,21 @@ printf 'lyftOS release %s\n' "$base_version" > /etc/system-release
 
 # this installs a package from fedora repos
 dnf5 install -y tmux
+
+sh -n /usr/libexec/ublue-motd
+sh -n /usr/share/lyftos/motd/env.sh
+test -s /usr/share/lyftos/motd/welcome.txt
+command -v timeout
+command -v bootc
+command -v gtk4-launch
+command -v yafti_gtk.py
+grep -qF '/usr/share/lyftos/motd/welcome.txt' /usr/libexec/ublue-motd
+grep -qF 'Name=lyftOS Portal' /usr/share/applications/io.github.ublue_os.yafti_gtk.desktop
+grep -qxF 'title: lyftOS Portal' /usr/share/yafti/yafti.yml
+if grep -qE '\b(brh|bazzite-rollback-helper)\b|rpm-ostree rebase' /usr/share/yafti/yafti.yml; then
+    echo 'lyftOS ERROR: Portal contains an upstream image-switch action' >&2
+    exit 1
+fi
 
 repo=/etc/yum.repos.d/terra-mesa.repo
 test -f "$repo"
