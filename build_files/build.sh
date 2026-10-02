@@ -2,13 +2,31 @@
 
 set -ouex pipefail
 
+# Keep the base theme's QML and dependencies; overlay our static settings below.
+if [ -d /usr/share/sddm/themes/breeze ]; then
+    mkdir -p /usr/share/sddm/themes/lyftos
+    cp -a /usr/share/sddm/themes/breeze/. /usr/share/sddm/themes/lyftos/
+fi
+
+for theme in com.valve.vapor.desktop com.valve.vgui.desktop; do
+    test -f "/usr/share/plasma/look-and-feel/${theme}/contents/splash/Splash.qml"
+    grep -qF 'images/bazzite_logo.svgz' "/usr/share/plasma/look-and-feel/${theme}/contents/splash/Splash.qml"
+done
+
 # Copy the contents of system_files/ of the git repo to /
 cp -avf "/ctx/system_files"/. /
+
+for theme in com.valve.vapor.desktop com.valve.vgui.desktop; do
+    gzip -t "/usr/share/plasma/look-and-feel/${theme}/contents/splash/images/bazzite_logo.svgz"
+done
 
 wallpaper=/usr/share/wallpapers/Zoople
 test -f "${wallpaper}/metadata.json"
 test -f "${wallpaper}/contents/screenshot.png"
 test -f "${wallpaper}/contents/images/3840x2160.png"
+for resolution in 1920x1080 2560x1440 1920x1200 2560x1600; do
+    test -s "${wallpaper}/contents/images/${resolution}.png"
+done
 python3 -c "import json,sys; json.load(open(sys.argv[1]))" "${wallpaper}/metadata.json"
 
 plasma_updates=/usr/share/plasma/shells/org.kde.plasma.desktop/contents/updates

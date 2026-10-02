@@ -18,7 +18,10 @@ if (typeof panel.floating !== "undefined") {
     panel.floating = false;
 }
 
-panel.addWidget("org.kde.plasma.kickoff");
+var launcher = panel.addWidget("org.kde.plasma.kickoff");
+launcher.currentConfigGroup = ["General"];
+launcher.writeConfig("icon", "lyftos-logo-icon");
+launcher.reloadConfig();
 
 // Same pins bazzite-pins.js would write. Setting them here means that script
 // finds a non-empty value and leaves our panel alone, whichever runs first.
