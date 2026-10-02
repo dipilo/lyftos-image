@@ -72,7 +72,8 @@ set_os_release() {
 }
 
 set_os_release NAME '"lyftOS"'
-set_os_release PRETTY_NAME "\"lyftOS (FROM Bazzite ${base_version})\""
+set_os_release PRETTY_NAME '"lyftOS"'
+set_os_release BOOTLOADER_NAME '"lyftOS"'
 set_os_release VARIANT '"lyftOS"'
 set_os_release DEFAULT_HOSTNAME '"lyftos"'
 set_os_release HOME_URL '"https://github.com/dipilo/lyftos-image"'
@@ -84,8 +85,12 @@ set_os_release ANSI_COLOR '"0;38;2;0;255;255"'
 
 grep -qE '^ID="?bazzite"?$' "$os_release"
 grep -qE "^VERSION_ID=\"?${base_version}\"?$" "$os_release"
-grep -q '^PRETTY_NAME="lyftOS ' "$os_release"
+grep -qxF 'PRETTY_NAME="lyftOS"' "$os_release"
+grep -qxF 'BOOTLOADER_NAME="lyftOS"' "$os_release"
 cat "$os_release"
+
+# grub2-mkconfig also reads the distributor from system-release.
+printf 'lyftOS release %s\n' "$base_version" > /etc/system-release
 
 ### Install packages
 
@@ -112,3 +117,20 @@ grep -q '^enabled=0$' "$repo"
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
+
+# Plymouth runs from the initramfs, which the base image built before our overlay.
+# Match Bazzite's generic initramfs flags and use the image's installed kernel.
+plymouth-set-default-theme spinner
+kernel_version=$(dnf5 repoquery --installed --queryformat='%{evr}.%{arch}' kernel)
+test -n "$kernel_version"
+test -f "/usr/lib/modules/${kernel_version}/vmlinuz"
+initramfs="/usr/lib/modules/${kernel_version}/initramfs.img"
+dracut --no-hostonly --kver "$kernel_version" --reproducible --zstd \
+    --add ostree --add fido2 --force "$initramfs"
+chmod 0600 "$initramfs"
+
+# Fail the build if the early-boot image still contains the inherited watermark.
+embedded_watermark=$(mktemp)
+lsinitrd --file usr/share/plymouth/themes/spinner/watermark.png "$initramfs" > "$embedded_watermark"
+cmp /usr/share/plymouth/themes/spinner/watermark.png "$embedded_watermark"
+rm -f "$embedded_watermark"
