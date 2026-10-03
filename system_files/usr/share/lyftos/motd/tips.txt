@@ -1,0 +1,7 @@
+Need an application? Open Bazaar to browse, install, and update Flatpak apps.
+Use `ujust --choose` to browse the setup tools inherited from Bazzite.
+Use `bootc status` to check your booted image and any staged or rollback deployment.
+An OS rollback does not restore your home directory, Flatpak apps, Homebrew packages, or Distrobox containers. Keep backups of your files.
+Prefer command-line tools? Run `brew help` to explore Homebrew.
+Want a quieter terminal? Run `ujust toggle-user-motd` to hide or restore this welcome.
+Update break something? Inspect the previous deployment before rolling back. [Read the lyftOS recovery guide](https://github.com/dipilo/lyftos-image/blob/main/README.md#getting-back).

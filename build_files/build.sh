@@ -119,14 +119,25 @@ dnf5 install -y tmux
 sh -n /usr/libexec/ublue-motd
 sh -n /usr/share/lyftos/motd/env.sh
 test -s /usr/share/lyftos/motd/welcome.txt
+test -s /usr/share/lyftos/motd/tips.txt
+command -v shuf
 command -v timeout
 command -v bootc
 command -v gtk4-launch
-command -v yafti_gtk.py
+portal_program=$(readlink -f "$(command -v yafti_gtk.py)")
+grep -q "^APP_TITLE = 'Bazzite Portal'$" "$portal_program"
+# Yafti ignores the YAML title for its window and regenerated autostart entry.
+sed -i -e 's/Bazzite Portal/lyftOS Portal/g' \
+    -e 's/Helps you setup Bazzite/Helps you set up lyftOS/g' "$portal_program"
+grep -q "^APP_TITLE = 'lyftOS Portal'$" "$portal_program"
+if grep -qF 'Bazzite Portal' "$portal_program"; then
+    echo 'lyftOS ERROR: inherited Portal window branding remains' >&2
+    exit 1
+fi
 grep -qF '/usr/share/lyftos/motd/welcome.txt' /usr/libexec/ublue-motd
 grep -qF 'Name=lyftOS Portal' /usr/share/applications/io.github.ublue_os.yafti_gtk.desktop
 grep -qxF 'title: lyftOS Portal' /usr/share/yafti/yafti.yml
-if grep -qE '\b(brh|bazzite-rollback-helper)\b|rpm-ostree rebase' /usr/share/yafti/yafti.yml; then
+if grep -qE '\b(brh|bazzite-rollback-helper)\b|rpm-ostree rebase|ujust verify-image' /usr/share/yafti/yafti.yml; then
     echo 'lyftOS ERROR: Portal contains an upstream image-switch action' >&2
     exit 1
 fi

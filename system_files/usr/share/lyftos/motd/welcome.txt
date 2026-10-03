@@ -1,26 +1,26 @@
-# Welcome to lyftOS
+# Welcome to lyftOS 󰊴
 
 Built on Bazzite and Universal Blue.
 
-## Deployment status
+## 󱋩 Deployment status
 
 ```text
 ${MOTD_DEPLOYMENT}
 ```
 
-| Command | Description |
+󰟀 ${MOTD_GREENBOOT}
+
+|  Command | Description |
 | ------- | ----------- |
-| `bootc status` | Inspect booted, staged, and rollback deployments |
-| `ujust --choose` | Browse inherited Bazzite setup tools |
+| `ujust --choose`  | List all available commands |
 | `ujust toggle-user-motd` | Toggle this banner on/off |
+| `fastfetch` | View system information |
 | `brew help` | Manage command line packages |
 
-Recovery: check the rollback deployment with `bootc status`, then use
-`sudo bootc rollback` and reboot. This restores the OS, not your home directory
-or applications stored outside the image. The previous deployment may be
-Bazzite if you have only just switched to lyftOS.
+${MOTD_TIP}
 
-- [lyftOS documentation](https://github.com/dipilo/lyftos-image/blob/main/README.md)
-- [Report a lyftOS issue](https://github.com/dipilo/lyftos-image/issues)
-- [lyftOS source](https://github.com/dipilo/lyftos-image)
-- [Upstream Bazzite documentation](https://docs.bazzite.gg/)
+- **** [Report an issue](https://github.com/dipilo/lyftos-image/issues)
+- **󰈙** [lyftOS documentation](https://github.com/dipilo/lyftos-image/blob/main/README.md)
+- **󰈙** [Upstream Bazzite documentation](https://docs.bazzite.gg/)
+- **󰙯** [Discord](https://dsc.gg/lyftos/)
+- **** [Bluesky](https://bsky.app/profile/lyftosaurus.bsky.social)

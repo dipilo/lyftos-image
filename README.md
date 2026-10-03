@@ -6,7 +6,7 @@ A gaming-first Linux desktop that aims to be approachable on day one and to have
 
 lyftOS derives from `ghcr.io/ublue-os/bazzite:stable` and deliberately adds as little as possible. The gaming stack, kernel, Mesa, Steam integration, driver work, Flatpak setup, Homebrew, and Distrobox all come from [Bazzite](https://github.com/ublue-os/bazzite) and the [Universal Blue](https://universal-blue.org/) project — that work is theirs, not ours. lyftOS was created from [ublue-os/image-template](https://github.com/ublue-os/image-template), Bazzite's [recommended route](https://docs.bazzite.gg/Advanced/creating_custom_image/) for derived images.
 
-What lyftOS adds on top is visible in one place, [`build_files/build.sh`](build_files/build.sh), plus the files under [`system_files/`](system_files). No Bazzite file is patched, renamed, or rewritten. Problems with games, drivers, or the desktop that reproduce on plain Bazzite belong upstream, not here.
+What lyftOS adds on top is visible in [`build_files/`](build_files/), plus the files under [`system_files/`](system_files). Branding replaces the inherited Vapor/VGUI splash artwork and sets login and lock-screen backgrounds. Problems with games, drivers, or the desktop that reproduce on plain Bazzite belong upstream, not here.
 
 ## Supported hardware
 
