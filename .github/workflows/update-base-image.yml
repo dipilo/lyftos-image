@@ -18,6 +18,10 @@ jobs:
   bump:
     name: Bump the pinned Bazzite digest
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [standard, nvidia-open, nvidia]
 
     steps:
       - name: Checkout
@@ -29,14 +33,17 @@ jobs:
           set -euo pipefail
           command -v skopeo >/dev/null || sudo apt-get install -y --no-install-recommends skopeo
 
-          PINNED=$(grep -m1 -E '^FROM .*@sha256:' Containerfile | awk '{print $2}')
+          PINNED=$(awk '$1 == "FROM" && $4 == "${{ matrix.variant }}" {print $2}' Containerfile)
+          test -n "${PINNED}"
           BASE="${PINNED%@*}"
           CURRENT="${PINNED#*@}"
           LATEST=$(skopeo inspect --format '{{.Digest}}' "docker://${BASE}")
 
-          echo "base=${BASE}" >> "${GITHUB_OUTPUT}"
-          echo "current=${CURRENT}" >> "${GITHUB_OUTPUT}"
-          echo "latest=${LATEST}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "base=${BASE}"
+            echo "current=${CURRENT}"
+            echo "latest=${LATEST}"
+          } >> "${GITHUB_OUTPUT}"
 
           if [[ "${CURRENT}" == "${LATEST}" ]]; then
             echo "changed=false" >> "${GITHUB_OUTPUT}"
@@ -55,7 +62,7 @@ jobs:
           LATEST: ${{ steps.resolve.outputs.latest }}
         run: |
           set -euo pipefail
-          BRANCH="base-image/${LATEST:7:12}"
+          BRANCH="base-image/${{ matrix.variant }}-${LATEST:7:12}"
 
           if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
             echo "${BRANCH} already exists; nothing to do."
@@ -75,7 +82,7 @@ jobs:
             --base "${{ github.event.repository.default_branch }}" \
             --head "${BRANCH}" \
             --label base-image \
-            --title "Update Bazzite base image to ${LATEST:7:12}" \
+            --title "Update Bazzite ${{ matrix.variant }} base image to ${LATEST:7:12}" \
             --body "$(cat <<EOF
           Pinned base image digest bump.
 

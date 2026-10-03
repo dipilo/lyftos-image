@@ -24,7 +24,7 @@
     },
     {
       "matchManagers": ["dockerfile"],
-      "matchPackageNames": ["ghcr.io/ublue-os/bazzite"],
+      "matchPackageNames": ["ghcr.io/ublue-os/bazzite", "ghcr.io/ublue-os/bazzite-nvidia-open", "ghcr.io/ublue-os/bazzite-nvidia"],
       "automerge": false,
       "addLabels": ["base-image"],
       "commitMessageTopic": "Bazzite base image",

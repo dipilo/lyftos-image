@@ -1,10 +1,16 @@
+ARG BASE_VARIANT=standard
+
 # Allow build scripts to be referenced without being copied into the final image
 FROM scratch AS ctx
 COPY build_files /
 COPY system_files /system_files
 
 # Base Image
-FROM ghcr.io/ublue-os/bazzite:stable@sha256:9556db65991d57a03a7dc18e4ba28a686d8bcdcd6b61235aa69c8267bb22ff76
+FROM ghcr.io/ublue-os/bazzite:stable@sha256:9556db65991d57a03a7dc18e4ba28a686d8bcdcd6b61235aa69c8267bb22ff76 AS standard
+FROM ghcr.io/ublue-os/bazzite-nvidia-open:stable@sha256:cd0cd28cfecd19e338bc1b942ec8ad2b80668ab043c9604ebc30d028ed3ce2fc AS nvidia-open
+FROM ghcr.io/ublue-os/bazzite-nvidia:stable@sha256:82ed40d6884bdab59af5994b62d791a594c0f52bc1abeb2f399ca6aac6dfd6fc AS nvidia
+FROM ${BASE_VARIANT} AS final
+ARG BASE_VARIANT
 ## Other possible base images include:
 # FROM ghcr.io/ublue-os/bazzite:testing
 # FROM ghcr.io/ublue-os/aurora:stable
@@ -34,7 +40,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build.sh
+    /ctx/build.sh "${BASE_VARIANT}"
 
 ### LINTING
 ## Verify final image and contents are correct.

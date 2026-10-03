@@ -4,6 +4,15 @@ name: Promote image
 on:
   workflow_dispatch:
     inputs:
+      variant:
+        description: "GPU image variant that was tested"
+        required: true
+        default: standard
+        type: choice
+        options:
+          - standard
+          - nvidia-open
+          - nvidia
       source:
         description: "Tested tag or digest to promote (e.g. testing-20260930-abc1234, or sha256:...)"
         required: true
@@ -32,7 +41,7 @@ env:
   IMAGE_NAME: ${{ github.event.repository.name }}
 
 concurrency:
-  group: promote-${{ inputs.channel }}
+  group: promote-${{ inputs.variant }}-${{ inputs.channel }}
   cancel-in-progress: false
 
 jobs:
@@ -51,6 +60,9 @@ jobs:
       - name: Prepare environment
         run: |
           set -euo pipefail
+          if [[ "${{ inputs.variant }}" != standard ]]; then
+            IMAGE_NAME+="-${{ inputs.variant }}"
+          fi
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
           command -v skopeo >/dev/null || sudo apt-get install -y --no-install-recommends skopeo
@@ -87,11 +99,13 @@ jobs:
           SOURCE_URL=$(jq -r '.Labels["org.opencontainers.image.source"] // "unknown"' /tmp/inspect.json)
           CREATED=$(jq -r '.Labels["org.opencontainers.image.created"] // "unknown"' /tmp/inspect.json)
 
-          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "source_url=${SOURCE_URL}" >> "${GITHUB_OUTPUT}"
-          echo "created=${CREATED}" >> "${GITHUB_OUTPUT}"
-          echo "image=${IMAGE}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "digest=${DIGEST}"
+            echo "version=${VERSION}"
+            echo "source_url=${SOURCE_URL}"
+            echo "created=${CREATED}"
+            echo "image=${IMAGE}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Verify the source image signature
         env:
@@ -148,7 +162,7 @@ jobs:
           CREATED: ${{ steps.resolve.outputs.created }}
         run: |
           set -euo pipefail
-          RELEASE_TAG="${CHANNEL}-$(date -u +%Y%m%d)-${DIGEST:7:12}"
+          RELEASE_TAG="${{ inputs.variant }}-${CHANNEL}-$(date -u +%Y%m%d)-${DIGEST:7:12}"
           PREVIOUS=$(gh release list --limit 1 --json tagName \
             --jq '.[0].tagName' 2>/dev/null || true)
 
@@ -192,5 +206,5 @@ jobs:
           } > /tmp/notes.md
 
           gh release create "${RELEASE_TAG}" \
-            --title "lyftOS ${CHANNEL} ${DIGEST:7:12}" \
+            --title "lyftOS ${{ inputs.variant }} ${CHANNEL} ${DIGEST:7:12}" \
             --notes-file /tmp/notes.md

@@ -12,10 +12,19 @@ What lyftOS adds on top is visible in [`build_files/`](build_files/), plus the f
 
 | | |
 | --- | --- |
-| Target | x86-64 desktop, AMD GPU, UEFI |
+| Target | x86-64 desktop, AMD or supported NVIDIA GPU, UEFI |
 | Tested | **Nothing yet** |
 
-Intel and NVIDIA GPUs, laptops, handhelds, and controllers beyond a basic gamepad are out of scope until they are independently tested. An AMD-only prototype is not a promise about other hardware.
+Choose the image for your GPU. NVIDIA drivers come from the corresponding pinned Bazzite base; no separate driver installation is needed.
+
+| Variant | Image | GPU |
+| --- | --- | --- |
+| `standard` | `lyftos-image` | AMD |
+| `nvidia-open` | `lyftos-image-nvidia-open` | Turing and newer: GTX 16 and RTX cards |
+| `nvidia` | `lyftos-image-nvidia` | Maxwell, Pascal, Volta: GTX 900/1000, GTX 750/750 Ti/745, Titan V |
+
+These are build targets, not hardware validation claims. See [Bazzite's NVIDIA compatibility guidance](https://docs.bazzite.gg/General/FAQ/#are-nvidia-graphics-card-drivers-pre-installed).
+Intel GPUs, laptops, handhelds, and controllers beyond a basic gamepad remain outside the tested scope.
 
 ## Trying it
 
@@ -30,6 +39,18 @@ sudo bootc switch ghcr.io/dipilo/lyftos-image:testing
 systemctl reboot
 ```
 
+For GTX 16 or RTX hardware, use the NVIDIA open variant once CI has published it:
+
+```bash
+cosign verify --key cosign.pub ghcr.io/dipilo/lyftos-image-nvidia-open:testing
+sudo bootc switch ghcr.io/dipilo/lyftos-image-nvidia-open:testing
+systemctl reboot
+```
+
+For older supported NVIDIA cards, replace `lyftos-image-nvidia-open` with
+`lyftos-image-nvidia`. After booting, check `nvidia-smi`, desktop login, a Steam
+game, and rollback on the target hardware before promoting that variant.
+
 Channels move; a digest does not. Once a build works on your hardware, pin it — every release note lists the digest it published:
 
 ```bash
@@ -38,7 +59,9 @@ sudo bootc switch ghcr.io/dipilo/lyftos-image@sha256:<digest>
 
 Installer media (ISO and qcow2) is built by **Actions → Build disk images**. It
 installs by pulling the selected channel from GHCR during installation, so that
-channel has to be publicly pullable first.
+channel has to be publicly pullable first. Select the matching `variant` in
+**Build disk images** and **Promote image**. Each variant has independent
+`testing` and `stable` channels; installers retain the selected GPU variant.
 
 ### Getting back
 
@@ -86,8 +109,18 @@ just lint && just format   # shellcheck and shfmt
 just check                 # Justfile syntax, also run in CI
 ```
 
+Build the NVIDIA variant for your GPU with one of these commands:
+
+```bash
+just build lyftos-image-nvidia-open testing nvidia-open  # GTX 16 / RTX
+just build lyftos-image-nvidia testing nvidia            # older supported NVIDIA
+```
+
+Pass the same image name to subsequent recipes, for example
+`just build-qcow2 localhost/lyftos-image-nvidia-open testing`.
+
 `just` reads its settings from [`image-template.env`](image-template.env). The full recipe list is in the
-[upstream template README](https://github.com/ublue-os/image-template#justfile-documentation), which these recipes come from unchanged.
+[upstream template README](https://github.com/ublue-os/image-template#justfile-documentation). The `build` recipe adds a third argument selecting the GPU variant; omitting it keeps the standard build.
 
 ### Building your own image from lyftOS
 

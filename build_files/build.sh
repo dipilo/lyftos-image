@@ -10,7 +10,11 @@ for path in /usr/libexec/ublue-motd /usr/share/yafti/yafti.yml \
 done
 
 # Review inherited setup actions when the pinned base changes.
-sha256sum -c /ctx/branding-upstream.sha256
+case "${1:-standard}" in
+    standard) sha256sum -c /ctx/branding-upstream.sha256 ;;
+    nvidia|nvidia-open) sha256sum -c /ctx/branding-upstream-nvidia.sha256 ;;
+    *) echo "Unknown image variant: $1" >&2; exit 1 ;;
+esac
 
 # Keep the base theme's QML and dependencies; overlay our static settings below.
 if [ -d /usr/share/sddm/themes/breeze ]; then
@@ -25,6 +29,14 @@ done
 
 # Copy the contents of system_files/ of the git repo to /
 cp -avf "/ctx/system_files"/. /
+case "${1:-standard}" in
+    nvidia|nvidia-open)
+        # The newer NVIDIA bases renamed Sunshine's Brew setup action.
+        sed -i -e 's/ujust setup-sunshine enable-beta/ujust setup-sunshine enable-brew/' \
+            -e 's/Enable Sunshine Beta (installed using Brew)/Enable Sunshine (installed using Brew)/' \
+            /usr/share/yafti/yafti.yml
+        ;;
+esac
 chmod 0755 /usr/libexec/ublue-motd
 
 for theme in com.valve.vapor.desktop com.valve.vgui.desktop; do
@@ -169,6 +181,14 @@ plymouth-set-default-theme spinner
 kernel_version=$(dnf5 repoquery --installed --queryformat='%{evr}.%{arch}' kernel)
 test -n "$kernel_version"
 test -f "/usr/lib/modules/${kernel_version}/vmlinuz"
+case "${1:-standard}" in
+    nvidia|nvidia-open)
+        command -v nvidia-smi
+        for module in nvidia nvidia_modeset nvidia_uvm nvidia_drm; do
+            modinfo -k "$kernel_version" "$module" >/dev/null
+        done
+        ;;
+esac
 initramfs="/usr/lib/modules/${kernel_version}/initramfs.img"
 dracut --no-hostonly --kver "$kernel_version" --reproducible --zstd \
     --add ostree --add fido2 --force "$initramfs"
