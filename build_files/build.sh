@@ -65,6 +65,7 @@ test -s /usr/share/lyftos/release
 
 icons=/usr/share/icons/hicolor
 test -f "$icons/scalable/apps/lyftos-logo.svg"
+test -s "$icons/scalable/apps/lyftos-portal.svg"
 for size in 16 22 24 32 36 48 96 256; do
     test -f "$icons/${size}x${size}/apps/lyftos-logo-icon.png"
 done
@@ -126,10 +127,14 @@ command -v bootc
 command -v gtk4-launch
 portal_program=$(readlink -f "$(command -v yafti_gtk.py)")
 grep -q "^APP_TITLE = 'Bazzite Portal'$" "$portal_program"
+grep -qF 'Gtk.Window.set_default_icon_name(APP_ID)' "$portal_program"
 # Yafti ignores the YAML title for its window and regenerated autostart entry.
 sed -i -e 's/Bazzite Portal/lyftOS Portal/g' \
-    -e 's/Helps you setup Bazzite/Helps you set up lyftOS/g' "$portal_program"
+    -e 's/Helps you setup Bazzite/Helps you set up lyftOS/g' \
+    -e 's/Icon=io.github.ublue_os.yafti_gtk/Icon=lyftos-portal/g' \
+    -e 's/Gtk.Window.set_default_icon_name(APP_ID)/Gtk.Window.set_default_icon_name("lyftos-portal")/' "$portal_program"
 grep -q "^APP_TITLE = 'lyftOS Portal'$" "$portal_program"
+grep -qF 'Gtk.Window.set_default_icon_name("lyftos-portal")' "$portal_program"
 if grep -qF 'Bazzite Portal' "$portal_program"; then
     echo 'lyftOS ERROR: inherited Portal window branding remains' >&2
     exit 1

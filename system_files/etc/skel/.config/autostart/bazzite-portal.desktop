@@ -2,7 +2,7 @@
 Name=lyftOS Portal
 Comment=Set up lyftOS with tools from Bazzite
 Exec=yafti_gtk.py /usr/share/yafti/yafti.yml
-Icon=io.github.ublue_os.yafti_gtk
+Icon=lyftos-portal
 Terminal=false
 Type=Application
 X-GNOME-Autostart-enabled=true
