@@ -7,7 +7,7 @@ COPY system_files /system_files
 
 # Base Image
 FROM ghcr.io/ublue-os/bazzite:stable@sha256:9556db65991d57a03a7dc18e4ba28a686d8bcdcd6b61235aa69c8267bb22ff76 AS standard
-FROM ghcr.io/ublue-os/bazzite-nvidia-open:stable@sha256:cd0cd28cfecd19e338bc1b942ec8ad2b80668ab043c9604ebc30d028ed3ce2fc AS nvidia-open
+FROM ghcr.io/ublue-os/bazzite-nvidia-open:stable@sha256:d0e5e105ebf43c7ddbe3c4a5dfecac1628b0e0dcf152bbd2aee0eda3e4b4cdd4 AS nvidia-open
 FROM ghcr.io/ublue-os/bazzite-nvidia:stable@sha256:82ed40d6884bdab59af5994b62d791a594c0f52bc1abeb2f399ca6aac6dfd6fc AS nvidia
 FROM ${BASE_VARIANT} AS final
 ARG BASE_VARIANT
